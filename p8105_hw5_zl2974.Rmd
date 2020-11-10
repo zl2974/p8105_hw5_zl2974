@@ -1,0 +1,87 @@
+---
+title: "HW 5"
+author: "Jeffrey Liang"
+date: "11/10/2020"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(patchwork)
+knitr::opts_chunk$set(
+  fig.height = 3,
+  fig.width = 4,
+  message = F,
+  echo = F,
+  warning = F,
+  cache = T
+)
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis",
+  digits = 3
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+
+```
+
+# Problem 1
+```{r}
+homicide = 
+  read_csv(here::here("data/homicide-data.csv")) %>% 
+  unite("city_state",c(city,state),sep=",")
+
+skimr::skim_without_charts(homicide)
+
+homicide %>% 
+  group_by(city_state) %>% 
+  count(disposition) %>% 
+  knitr::kable()
+```
+
+Prop test
+```{r}
+
+test_Baltimore =
+  prop.test(
+    x = homicide %>%
+      filter(str_detect(city_state, "Baltimore,MD"),
+             disposition == "Closed by arrest") %>%
+      nrow(), 
+    n = nrow(homicide %>%
+      filter(str_detect(city_state, "Baltimore,MD")))
+  ) %>%
+  broom::tidy() %>% 
+  select(estimate,conf.low,conf.high)
+
+test_Baltimore
+```
+
+To all city
+```{r}
+homicide_test =
+  function(homicide_data, city_state) {
+    homicide_data =
+      homicide_data %>%
+      filter(str_detect(city_state, city_state))
+    
+    prop.test(
+      x = homicide_data %>%
+        filter(disposition == "Closed by arrest") %>%
+        nrow(),
+      n = homicide_data %>% nrow()
+    ) %>%
+      broom::tidy() %>%
+      select(estimate, conf.low, conf.high) %>%
+      return()
+  }
+
+homicide =
+  homicide %>% 
+  mutate(test = map(.x = city_state,~homicide_test(homicide,.x))) %>% 
+  unnest(test)
+```
+
