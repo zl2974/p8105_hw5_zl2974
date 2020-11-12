@@ -10,8 +10,8 @@ library(tidyverse)
 library(readxl)
 library(patchwork)
 knitr::opts_chunk$set(
-  fig.height = 3,
-  fig.width = 4,
+  fig.height = 6,
+  fig.width = 8,
   message = F,
   echo = F,
   warning = F,
@@ -28,60 +28,46 @@ scale_fill_discrete = scale_fill_viridis_d
 
 ```
 
-# Problem 1
-```{r}
-homicide = 
-  read_csv(here::here("data/homicide-data.csv")) %>% 
-  unite("city_state",c(city,state),sep=",")
 
-skimr::skim_without_charts(homicide)
+# Problem 2
 
-homicide %>% 
-  group_by(city_state) %>% 
-  count(disposition) %>% 
-  knitr::kable()
-```
-
-Prop test
-```{r}
-
-test_Baltimore =
-  prop.test(
-    x = homicide %>%
-      filter(str_detect(city_state, "Baltimore,MD"),
-             disposition == "Closed by arrest") %>%
-      nrow(), 
-    n = nrow(homicide %>%
-      filter(str_detect(city_state, "Baltimore,MD")))
+## Read the data
+```{r read_data}
+rct_dat =
+  tibble(file_name =
+           list.files(here::here("data"),
+                      "con|exp",
+                      full.names = T)) %>%
+  mutate(data = map(file_name, read_csv)) %>%
+  unnest(data) %>%
+  mutate(group = str_extract_all(file_name, "(exp_\\d+|con_\\d+)")) %>%
+  separate(group, into = c("arm", "subject_id")) %>%
+  pivot_longer(
+    week_1:week_8,
+    names_to = "number_of_week",
+    values_to = "observation",
+    names_prefix = "week_"
   ) %>%
-  broom::tidy() %>% 
-  select(estimate,conf.low,conf.high)
+  mutate(across(number_of_week, as.numeric)) %>%
+  select(-file_name)
 
-test_Baltimore
+rct_dat %>% head() %>% knitr::kable()
 ```
 
-To all city
+
+## Plot data
 ```{r}
-homicide_test =
-  function(homicide_data, city_state) {
-    homicide_data =
-      homicide_data %>%
-      filter(str_detect(city_state, city_state))
-    
-    prop.test(
-      x = homicide_data %>%
-        filter(disposition == "Closed by arrest") %>%
-        nrow(),
-      n = homicide_data %>% nrow()
-    ) %>%
-      broom::tidy() %>%
-      select(estimate, conf.low, conf.high) %>%
-      return()
-  }
+plt_spaghetti =
+  rct_dat %>%
+  unite("id", c(arm, subject_id), sep = ":", remove = F) %>%
+  ggplot(aes(x = number_of_week,
+             y = observation)) +
+  geom_path(aes(color = arm,
+                group = as.factor(id)),
+            alpha = 0.5) +
+  geom_smooth(aes(color = arm), se = F)
 
-homicide =
-  homicide %>% 
-  mutate(test = map(.x = city_state,~homicide_test(homicide,.x))) %>% 
-  unnest(test)
+show(plt_spaghetti)
 ```
 
+\ As we can see from above, the observation from experiment group starts at the same level as the control group, increases as time passes, while the observation in control group stay at the same level.
