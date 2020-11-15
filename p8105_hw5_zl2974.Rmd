@@ -143,11 +143,11 @@ for (i in 0:6) {
         )),
       z_test = map(.x = z_statistics, ~ z_test(
         zscore = .x,
-        mu = i,
+        mu = 0,
         sd = 5,
         alpha = 0.05
       )),
-      t_test = map(.x = raw, ~ t.test(.x, mu =i, sd = 5)),
+      t_test = map(.x = raw, ~ t.test(.x, mu =0, sd = 5)),
       t_test = map(t_test, broom::tidy)
     ) %>%
     unnest(z_test, t_test) %>%
@@ -156,6 +156,7 @@ for (i in 0:6) {
 
 plot_data = plot_data %>% bind_rows()
 ```
+
 ```{r plot}
 plot_data %>% 
   group_by(mu) %>% 
@@ -166,12 +167,73 @@ plot_data %>%
   labs( title = "Proportion of times the null was rejected",
        y = "Proportion") +
   scale_y_continuous(
-    limits = c(0,0.07)
+    #limits = c(0,0.07)
   ) +
   guides(fill = guide_legend(nrow = 1))
 
+ggplot() +
+  geom_point(
+    data = plot_data %>% 
+      group_by(mu) %>% 
+      summarise(estimate = mean(estimate)),
+    aes(
+      x = mu,
+      y = estimate,
+      color = "True mu"
+    ),
+    show_guide = TRUE
+  ) +
+  geom_point(
+    data =
+      plot_data %>%
+      filter(t_accept_h0 == F)%>% 
+      group_by(mu) %>% 
+      summarise(estimate = mean(estimate)),
+    aes(
+      x = mu,
+      y = estimate,
+      color = "Estimate mu"
+    ),
+    show_guide = TRUE
+  ) +
+  geom_path(
+    data = plot_data %>% 
+      group_by(mu) %>% 
+      summarise(estimate = mean(estimate)),
+    aes(
+      x = mu,
+      y = estimate,
+      color = "True mu"
+    ),
+    show_guide = TRUE
+  ) +
+  geom_path(
+    data =
+      plot_data %>%
+      filter(t_accept_h0 == F)%>% 
+      group_by(mu) %>% 
+      summarise(estimate = mean(estimate)),
+    aes(
+      x = mu,
+      y = estimate,
+      color = "Estimate mu"
+    ),
+    show_guide = TRUE
+  ) +
+  scale_x_continuous(n.breaks = 7,
+                     name = "True mu") +
+  scale_y_continuous(name = "Estimate mu",
+                     breaks = seq(-2, 8, 2)) +
+  scale_color_manual(
+    name = '',
+    values = c(
+      "True mu" = viridis::viridis(2)[[1]],
+      "Estimate mu" = viridis::viridis(2)[[2]]
+    )
+  ) +
+  labs(title = "TRUE mu vs Estimate mu")
 
-
+plot_wrong =
 ggplot() +
   geom_violin(
     data = plot_data,
@@ -210,7 +272,7 @@ ggplot() +
       "True mu" = viridis::viridis(2)[[1]],
       "Estimate mu" = viridis::viridis(2)[[2]]
     ),
-    labels = c("mean", "median")
+    labels = c("True mu","Estimate mu")
   ) +
   labs(title = "TRUE mu vs Estimate mu")
 ```
