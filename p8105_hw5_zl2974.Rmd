@@ -71,3 +71,103 @@ show(plt_spaghetti)
 ```
 
 \ As we can see from above, the observation from experiment group starts at the same level as the control group, increases as time passes, while the observation in control group stay at the same level.
+
+# Problem 3
+```{r}
+z_test =
+  function(zscore,
+           mu = 0,
+           sd = 1,
+           method = "two-sided",
+           alpha = 0.05) {
+    if (method == "two-sided") {
+      accept_h0 = between(zscore, qnorm(alpha / 2, mu, sd), qnorm(1 - alpha /
+                                                                    2, mu, sd))
+      p = pnorm(-abs(zscore), mu, sd)
+    } else if (method == "less") {
+      accept_h0 = zscore >= qnorm(alpha, mu, sd)
+      p = pnorm(-abs(zscore), mu, sd)
+    } else if (method == "greater") {
+      accept_h0 = zscore <= qnorm(1 - alpha, mu, sd)
+      p = pnorm(-abs(zscore), mu, sd)
+    } else {
+      stop("wrong method")
+    }
+    
+    return(tibble(accept_h0 = accept_h0,
+                  p = p))
+  }
+
+z_score =
+  function(vec, mu = 0, sd = 1) {
+    z =
+      (mean(vec) - mu) / (sd / sqrt(length(n)))
+    return(z)
+  }
+
+test_data =
+  tibble(mu = 0) %>%
+  mutate(raw = map(.x = mu, ~rerun(5000, rnorm(30, .x, 5)))) %>% 
+  unnest(raw) %>% 
+  mutate(
+    z_statistics =
+      map_dbl(.x = raw,  ~ z_score(
+        vec = .x, mu = 0, sd = 5
+      )),
+    z_test = map(.x = z_statistics, ~ z_test(
+      zscore = .x,
+      mu = 0,
+      sd = 5,
+      alpha = 0.05
+    )),
+    t_test = map(.x = raw, ~ t.test(.x, sd = 5)),
+    t_test = map(t_test, broom::tidy)
+  ) %>%
+  unnest(z_test, t_test) %>% 
+  mutate(t_accept_h0 = p.value >0.05)
+
+test_data
+```
+
+```{r}
+plot_data = list()
+for (i in seq(0:6)) {
+  plot_data[[i]] =
+    tibble(mu = i) %>%
+    mutate(raw = map(.x = mu, ~ rerun(5000, rnorm(30, .x, 5)))) %>%
+    unnest(raw) %>%
+    mutate(
+      z_statistics =
+        map_dbl(.x = raw,  ~ z_score(
+          vec = .x, mu = i, sd = 5
+        )),
+      z_test = map(.x = z_statistics, ~ z_test(
+        zscore = .x,
+        mu = i,
+        sd = 5,
+        alpha = 0.05
+      )),
+      t_test = map(.x = raw, ~ t.test(.x, mu =i, sd = 5)),
+      t_test = map(t_test, broom::tidy)
+    ) %>%
+    unnest(z_test, t_test) %>%
+    mutate(t_accept_h0 = p.value > 0.05)
+}
+
+plot_data = plot_data %>% bind_rows()
+```
+```{r plot}
+plot_data %>% 
+  group_by(mu) %>% 
+  summarise(p_reject = 1- sum(t_accept_h0)/n()) %>% 
+  mutate(mu = as.factor(mu)) %>% 
+  ggplot(aes(x = mu, y = p_reject, fill = mu)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  labs( title = "Proportion of times the null was rejected",
+       y = "Proportion") +
+  scale_y_continuous(
+    limits = c(0,0.07)
+  ) +
+  guides(fill = guide_legend(nrow = 1))
+```
+
