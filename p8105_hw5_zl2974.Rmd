@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
   fig.height = 6,
   fig.width = 8,
   message = F,
-  echo = F,
+  echo = T,
   warning = F,
   cache = T
 )
@@ -232,7 +232,7 @@ plot_data %>%
   guides(fill = guide_legend(nrow = 1))
 ```
 
-## estiamte mu favor H1 and the True mu
+## Estiamte mu favor H1 and the true mu
 
 ```{r plot_2}
 ggplot() +
